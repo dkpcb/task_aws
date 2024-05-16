@@ -55,8 +55,8 @@ class task(Stack):
             handler="api.post_task",
             **common_params,
         )
-        patch_task_lambda = _lambda.Function(
-            self, "Patchtask",
+        put_task_lambda = _lambda.Function(
+            self, "Puttask",
             code=_lambda.Code.from_asset("api"),
             handler="api.change_finished_task",
             **common_params,
@@ -70,7 +70,7 @@ class task(Stack):
 
         table.grant_read_data(get_task_lambda)
         table.grant_read_write_data(post_task_lambda)
-        table.grant_read_write_data(patch_task_lambda)
+        table.grant_read_write_data(put_task_lambda)
         table.grant_read_write_data(delete_task_lambda)
         
         api = apigw.RestApi(
@@ -93,8 +93,8 @@ class task(Stack):
 
         task_item_id = task.add_resource("{item_id}")
         task_item_id.add_method(
-            "PATCH",
-            apigw.LambdaIntegration(patch_task_lambda)
+            "PUT",
+            apigw.LambdaIntegration(put_task_lambda)
         )
         task_item_id.add_method(
             "DELETE",

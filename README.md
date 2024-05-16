@@ -1,0 +1,1 @@
+GET /task <br> POST /task <br> PUT /task <br> DELETE /task <br>
