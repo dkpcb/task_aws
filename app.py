@@ -117,7 +117,7 @@ class task(Stack):
 
 app = cdk.App()
 task(
-    app, "Bashoutter",
+    app, "task",
     env={
         "region": os.environ["CDK_DEFAULT_REGION"],
         "account": os.environ["CDK_DEFAULT_ACCOUNT"],
