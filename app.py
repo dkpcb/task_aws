@@ -58,7 +58,7 @@ class task(Stack):
         patch_task_lambda = _lambda.Function(
             self, "Patchtask",
             code=_lambda.Code.from_asset("api"),
-            handler="api.patch_task",
+            handler="api.change_finished_task",
             **common_params,
         )
         delete_task_lambda = _lambda.Function(

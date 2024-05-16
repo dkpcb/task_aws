@@ -67,7 +67,7 @@ def post_task(event, context):
         "body": json.dumps(resp)
     }
 
-def change_finished_task_handler(event, context):
+def change_finished_task(event, context):
     
     try:
         path_params = event.get("pathParameters", {})
