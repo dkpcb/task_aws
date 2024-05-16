@@ -1,5 +1,7 @@
+from constructs import Construct
+import aws_cdk as cdk
 from aws_cdk import (
-    core,
+    Stack,
     aws_dynamodb as ddb,
     aws_s3 as s3,
     aws_s3_deployment as s3_deploy,
@@ -9,106 +11,96 @@ from aws_cdk import (
 )
 import os
 
-class Bashoutter(core.Stack):
+class task(Stack):
 
-    def __init__(self, scope: core.App, name: str, **kwargs) -> None:
-        super().__init__(scope, name, **kwargs)
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
 
-        # <1>
-        # dynamoDB table to store haiku
         table = ddb.Table(
-            self, "Bashoutter-Table",
+            self, "taskr-Table",
             partition_key=ddb.Attribute(
                 name="item_id",
                 type=ddb.AttributeType.STRING
             ),
             billing_mode=ddb.BillingMode.PAY_PER_REQUEST,
-            removal_policy=core.RemovalPolicy.DESTROY
+            removal_policy=cdk.RemovalPolicy.DESTROY
         )
 
-        # <2>
         bucket = s3.Bucket(
-            self, "Bashoutter-Bucket",
+            self, "task-Bucket",
             website_index_document="index.html",
             public_read_access=True,
             auto_delete_objects=True,
-            removal_policy=core.RemovalPolicy.DESTROY
+            removal_policy=cdk.RemovalPolicy.DESTROY
         )
 
         common_params = {
-            "runtime": _lambda.Runtime.PYTHON_3_7,
+            "runtime": _lambda.Runtime.PYTHON_3_8,
             "environment": {
                 "TABLE_NAME": table.table_name
             }
         }
 
-        # <3>
-        # define Lambda functions
-        get_haiku_lambda = _lambda.Function(
-            self, "GetHaiku",
+        get_task_lambda = _lambda.Function(
+            self, "Gettask",
             code=_lambda.Code.from_asset("api"),
-            handler="api.get_haiku",
+            handler="api.get_task",
             memory_size=512,
-            timeout=core.Duration.seconds(10),
+            timeout=cdk.Duration.seconds(10),
             **common_params,
         )
-        post_haiku_lambda = _lambda.Function(
-            self, "PostHaiku",
+        post_task_lambda = _lambda.Function(
+            self, "Posttask",
             code=_lambda.Code.from_asset("api"),
-            handler="api.post_haiku",
+            handler="api.post_task",
             **common_params,
         )
-        patch_haiku_lambda = _lambda.Function(
-            self, "PatchHaiku",
+        patch_task_lambda = _lambda.Function(
+            self, "Patchtask",
             code=_lambda.Code.from_asset("api"),
-            handler="api.patch_haiku",
+            handler="api.patch_task",
             **common_params,
         )
-        delete_haiku_lambda = _lambda.Function(
-            self, "DeleteHaiku",
+        delete_task_lambda = _lambda.Function(
+            self, "Deletetask",
             code=_lambda.Code.from_asset("api"),
-            handler="api.delete_haiku",
+            handler="api.delete_task",
             **common_params,
         )
 
-        # <4>
-        # grant permissions
-        table.grant_read_data(get_haiku_lambda)
-        table.grant_read_write_data(post_haiku_lambda)
-        table.grant_read_write_data(patch_haiku_lambda)
-        table.grant_read_write_data(delete_haiku_lambda)
-
-        # <5>
-        # define API Gateway
+        table.grant_read_data(get_task_lambda)
+        table.grant_read_write_data(post_task_lambda)
+        table.grant_read_write_data(patch_task_lambda)
+        table.grant_read_write_data(delete_task_lambda)
+        
         api = apigw.RestApi(
-            self, "BashoutterApi",
+            self, "taskApi",
             default_cors_preflight_options=apigw.CorsOptions(
                 allow_origins=apigw.Cors.ALL_ORIGINS,
                 allow_methods=apigw.Cors.ALL_METHODS,
             )
         )
 
-        haiku = api.root.add_resource("haiku")
-        haiku.add_method(
+        task = api.root.add_resource("task")
+        task.add_method(
             "GET",
-            apigw.LambdaIntegration(get_haiku_lambda)
+            apigw.LambdaIntegration(get_task_lambda)
         )
-        haiku.add_method(
+        task.add_method(
             "POST",
-            apigw.LambdaIntegration(post_haiku_lambda)
+            apigw.LambdaIntegration(post_task_lambda)
         )
 
-        haiku_item_id = haiku.add_resource("{item_id}")
-        haiku_item_id.add_method(
+        task_item_id = task.add_resource("{item_id}")
+        task_item_id.add_method(
             "PATCH",
-            apigw.LambdaIntegration(patch_haiku_lambda)
+            apigw.LambdaIntegration(patch_task_lambda)
         )
-        haiku_item_id.add_method(
+        task_item_id.add_method(
             "DELETE",
-            apigw.LambdaIntegration(delete_haiku_lambda)
+            apigw.LambdaIntegration(delete_task_lambda)
         )
 
-        # store parameters in SSM
         ssm.StringParameter(
             self, "TABLE_NAME",
             parameter_name="TABLE_NAME",
@@ -121,10 +113,10 @@ class Bashoutter(core.Stack):
         )
 
         # Output parameters
-        core.CfnOutput(self, 'BucketUrl', value=bucket.bucket_website_domain_name)
+        cdk.CfnOutput(self, 'BucketUrl', value=bucket.bucket_website_domain_name)
 
-app = core.App()
-Bashoutter(
+app = cdk.App()
+task(
     app, "Bashoutter",
     env={
         "region": os.environ["CDK_DEFAULT_REGION"],
