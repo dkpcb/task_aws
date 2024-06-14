@@ -103,7 +103,7 @@ def change_finished_task(event, context):
         "body": json.dumps(resp)
     }
 
-def delete_haiku(event, context):
+def delete_task(event, context):
 
     try:
         path_params = event.get("pathParameters", {})
