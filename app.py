@@ -1,106 +1,104 @@
 from constructs import Construct
-import aws_cdk as cdk
 from aws_cdk import (
     Stack,
-    aws_dynamodb as ddb,
-    aws_s3 as s3,
-    aws_s3_deployment as s3_deploy,
-    aws_lambda as _lambda,
+    aws_dynamodb as dynamodb,
+    aws_lambda as lambda_,
     aws_ssm as ssm,
-    aws_apigateway as apigw,
+    aws_apigateway as apigateway,
+    RemovalPolicy,
+    Duration
 )
 import os
 
-class task(Stack):
+class TaskStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        table = ddb.Table(
+        # DynamoDB Table
+        table = dynamodb.Table(
             self, "taskr-Table",
-            partition_key=ddb.Attribute(
+            partition_key=dynamodb.Attribute(
                 name="item_id",
-                type=ddb.AttributeType.STRING
+                type=dynamodb.AttributeType.STRING
             ),
-            billing_mode=ddb.BillingMode.PAY_PER_REQUEST,
-            removal_policy=cdk.RemovalPolicy.DESTROY
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY
         )
 
-        bucket = s3.Bucket(
-            self, "task-Bucket",
-            website_index_document="index.html",
-            public_read_access=True,
-            auto_delete_objects=True,
-            removal_policy=cdk.RemovalPolicy.DESTROY
-        )
-
+        # Lambda Environment Parameters
         common_params = {
-            "runtime": _lambda.Runtime.PYTHON_3_8,
+            "runtime": lambda_.Runtime.PYTHON_3_8,
             "environment": {
                 "TABLE_NAME": table.table_name
             }
         }
 
-        get_task_lambda = _lambda.Function(
+        # Lambda Functions for Task Operations
+        get_task_lambda = lambda_.Function(
             self, "Gettask",
-            code=_lambda.Code.from_asset("api"),
+            code=lambda_.Code.from_asset("api"),
             handler="api.get_task",
             memory_size=512,
-            timeout=cdk.Duration.seconds(10),
+            timeout=Duration.seconds(10),
             **common_params,
         )
-        post_task_lambda = _lambda.Function(
+        post_task_lambda = lambda_.Function(
             self, "Posttask",
-            code=_lambda.Code.from_asset("api"),
+            code=lambda_.Code.from_asset("api"),
             handler="api.post_task",
             **common_params,
         )
-        put_task_lambda = _lambda.Function(
+        put_task_lambda = lambda_.Function(
             self, "Puttask",
-            code=_lambda.Code.from_asset("api"),
+            code=lambda_.Code.from_asset("api"),
             handler="api.change_finished_task",
             **common_params,
         )
-        delete_task_lambda = _lambda.Function(
+        delete_task_lambda = lambda_.Function(
             self, "Deletetask",
-            code=_lambda.Code.from_asset("api"),
+            code=lambda_.Code.from_asset("api"),
             handler="api.delete_task",
             **common_params,
         )
 
+        # Grant Table Permissions to Lambda Functions
         table.grant_read_data(get_task_lambda)
         table.grant_read_write_data(post_task_lambda)
         table.grant_read_write_data(put_task_lambda)
         table.grant_read_write_data(delete_task_lambda)
         
-        api = apigw.RestApi(
+        # API Gateway Setup
+        api = apigateway.RestApi(
             self, "taskApi",
-            default_cors_preflight_options=apigw.CorsOptions(
-                allow_origins=apigw.Cors.ALL_ORIGINS,
-                allow_methods=apigw.Cors.ALL_METHODS,
+            default_cors_preflight_options=apigateway.CorsOptions(
+                allow_origins=apigateway.Cors.ALL_ORIGINS,
+                allow_methods=apigateway.Cors.ALL_METHODS,
             )
         )
 
+        # Define API Resources and Methods
         task = api.root.add_resource("task")
         task.add_method(
             "GET",
-            apigw.LambdaIntegration(get_task_lambda)
+            apigateway.LambdaIntegration(get_task_lambda)
         )
         task.add_method(
             "POST",
-            apigw.LambdaIntegration(post_task_lambda)
+            apigateway.LambdaIntegration(post_task_lambda)
         )
 
         task_item_id = task.add_resource("{item_id}")
         task_item_id.add_method(
             "PUT",
-            apigw.LambdaIntegration(put_task_lambda)
+            apigateway.LambdaIntegration(put_task_lambda)
         )
         task_item_id.add_method(
             "DELETE",
-            apigw.LambdaIntegration(delete_task_lambda)
+            apigateway.LambdaIntegration(delete_task_lambda)
         )
 
+        # Store Parameters in SSM Parameter Store
         ssm.StringParameter(
             self, "TABLE_NAME",
             parameter_name="TABLE_NAME",
@@ -112,12 +110,11 @@ class task(Stack):
             string_value=api.url
         )
 
-        # Output parameters
-        cdk.CfnOutput(self, 'BucketUrl', value=bucket.bucket_website_domain_name)
+from aws_cdk import App
 
-app = cdk.App()
-task(
-    app, "task",
+app = App()
+TaskStack(
+    app, "TaskStack",
     env={
         "region": os.environ["CDK_DEFAULT_REGION"],
         "account": os.environ["CDK_DEFAULT_ACCOUNT"],
